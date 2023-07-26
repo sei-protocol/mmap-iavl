@@ -1,4 +1,4 @@
-module github.com/sei-protocol/sei-chain
+module github.com/sei-protocol/mmap-iavl
 
 go 1.20
 
