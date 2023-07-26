@@ -128,8 +128,8 @@ require (
 )
 
 replace (
-	github.com/cosmos/cosmos-sdk => ../sei-cosmos
-	github.com/cosmos/iavl => ../sei-iavl
+	github.com/cosmos/cosmos-sdk => github.com/sei-protocol/sei-cosmos v0.2.60
+	github.com/cosmos/iavl => github.com/sei-protocol/sei-iavl v0.1.8-0.20230726213826-031d03d26f2d
 	github.com/gogo/protobuf => github.com/regen-network/protobuf v1.3.3-alpha.regen.1
 	github.com/tendermint/tendermint => github.com/sei-protocol/sei-tendermint v0.2.24
 	github.com/tendermint/tm-db => github.com/sei-protocol/tm-db v0.0.4
