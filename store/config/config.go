@@ -1,6 +1,6 @@
 package config
 
-import "github.com/sei-protocol/sei-chain/memiavl"
+import "github.com/sei-protocol/mmap-iavl/memiavl"
 
 const DefaultCacheSize = 1000
 

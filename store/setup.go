@@ -1,6 +1,8 @@
 package store
 
 import (
+	"github.com/sei-protocol/mmap-iavl/memiavl"
+	"github.com/sei-protocol/mmap-iavl/store/rootmulti"
 	"path/filepath"
 
 	"github.com/spf13/cast"
@@ -8,8 +10,6 @@ import (
 
 	"github.com/cosmos/cosmos-sdk/baseapp"
 	servertypes "github.com/cosmos/cosmos-sdk/server/types"
-	"github.com/sei-protocol/sei-chain/memiavl"
-	"github.com/sei-protocol/sei-chain/store/rootmulti"
 )
 
 const (

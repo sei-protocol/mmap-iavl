@@ -1,12 +1,12 @@
 package cachemulti_test
 
 import (
+	"github.com/sei-protocol/mmap-iavl/store"
+	"github.com/sei-protocol/mmap-iavl/store/whitelist/cachemulti"
 	"testing"
 
 	storetypes "github.com/cosmos/cosmos-sdk/store/types"
 	"github.com/cosmos/cosmos-sdk/types"
-	"github.com/sei-protocol/sei-chain/store"
-	"github.com/sei-protocol/sei-chain/store/whitelist/cachemulti"
 	"github.com/stretchr/testify/require"
 )
 

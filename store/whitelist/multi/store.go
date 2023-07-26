@@ -2,8 +2,8 @@ package multi
 
 import (
 	storetypes "github.com/cosmos/cosmos-sdk/store/types"
-	"github.com/sei-protocol/sei-chain/store/whitelist/cachemulti"
-	"github.com/sei-protocol/sei-chain/store/whitelist/kv"
+	"github.com/sei-protocol/mmap-iavl/store/whitelist/cachemulti"
+	"github.com/sei-protocol/mmap-iavl/store/whitelist/kv"
 )
 
 type Store struct {

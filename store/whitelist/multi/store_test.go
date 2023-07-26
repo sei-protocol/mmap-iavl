@@ -1,12 +1,12 @@
 package multi_test
 
 import (
+	"github.com/sei-protocol/mmap-iavl/store"
+	"github.com/sei-protocol/mmap-iavl/store/whitelist/multi"
 	"testing"
 
 	storetypes "github.com/cosmos/cosmos-sdk/store/types"
 	"github.com/cosmos/cosmos-sdk/types"
-	"github.com/sei-protocol/sei-chain/store"
-	"github.com/sei-protocol/sei-chain/store/whitelist/multi"
 	"github.com/stretchr/testify/require"
 )
 

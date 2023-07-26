@@ -2,6 +2,8 @@ package rootmulti
 
 import (
 	"fmt"
+	"github.com/sei-protocol/mmap-iavl/memiavl"
+	"github.com/sei-protocol/mmap-iavl/store/memiavlstore"
 	"io"
 	"math"
 	"sort"
@@ -21,9 +23,6 @@ import (
 	"github.com/cosmos/cosmos-sdk/store/transient"
 	"github.com/cosmos/cosmos-sdk/store/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
-
-	"github.com/sei-protocol/sei-chain/memiavl"
-	"github.com/sei-protocol/sei-chain/store/memiavlstore"
 )
 
 const CommitInfoFileName = "commit_infos"
