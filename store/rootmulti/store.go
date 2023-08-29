@@ -98,10 +98,13 @@ func (rs *Store) Commit(bumpVersion bool) types.CommitID {
 		}
 	}
 
-	rs.lastCommitInfo = rs.db.LastCommitInfo()
-	if rs.sdk46Compact {
-		rs.lastCommitInfo = amendCommitInfo(rs.lastCommitInfo, rs.storesParams)
+	if bumpVersion {
+		rs.lastCommitInfo = rs.db.LastCommitInfo()
+		if rs.sdk46Compact {
+			rs.lastCommitInfo = amendCommitInfo(rs.lastCommitInfo, rs.storesParams)
+		}
 	}
+
 	return rs.lastCommitInfo.CommitID()
 }
 
