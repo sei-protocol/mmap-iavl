@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	storetypes "github.com/cosmos/cosmos-sdk/store/types"
 	"github.com/tendermint/tendermint/libs/log"
@@ -329,6 +330,18 @@ func (db *DB) checkAsyncCommit() error {
 	return nil
 }
 
+// CommittedVersion returns the latest version written in wal, or snapshot version if wal is empty.
+func (db *DB) CommittedVersion() (int64, error) {
+	lastIndex, err := db.wal.LastIndex()
+	if err != nil {
+		return 0, err
+	}
+	if lastIndex == 0 {
+		return db.SnapshotVersion(), nil
+	}
+	return walVersion(lastIndex, db.initialVersion), nil
+}
+
 // checkBackgroundSnapshotRewrite check the result of background snapshot rewrite, cleans up the old snapshots and switches to a new multitree
 func (db *DB) checkBackgroundSnapshotRewrite() error {
 	// check the completeness of background snapshot rewriting
@@ -339,6 +352,19 @@ func (db *DB) checkBackgroundSnapshotRewrite() error {
 		if result.mtree == nil {
 			// background snapshot rewrite failed
 			return fmt.Errorf("background snapshot rewriting failed: %w", result.err)
+		}
+
+		// wait for potential pending wal writings to finish, to make sure we catch up to latest state.
+		// in real world, block execution should be slower than wal writing, so this should not block for long.
+		for {
+			committedVersion, err := db.CommittedVersion()
+			if err != nil {
+				return fmt.Errorf("get wal version failed: %w", err)
+			}
+			if db.lastCommitInfo.Version == committedVersion {
+				break
+			}
+			time.Sleep(10 * time.Nanosecond)
 		}
 
 		// catchup the remaining wal
@@ -474,17 +500,30 @@ func (db *DB) initAsyncCommit() {
 	go func() {
 		defer close(walQuit)
 
-		for entry := range walChan {
-			bz, err := entry.data.Marshal()
-			if err != nil {
+		batch := wal.Batch{}
+		for {
+			entries := channelBatchRecv(walChan)
+			if len(entries) == 0 {
+				// channel is closed
+				break
+			}
+
+			for _, entry := range entries {
+				bz, err := entry.data.Marshal()
+				if err != nil {
+					walQuit <- err
+					return
+				}
+				batch.Write(entry.index, bz)
+			}
+
+			if err := db.wal.WriteBatch(&batch); err != nil {
 				walQuit <- err
 				return
 			}
-			if err := db.wal.Write(entry.index, bz); err != nil {
-				walQuit <- err
-				return
-			}
+			batch.Clear()
 		}
+
 	}()
 
 	db.walChan = walChan
@@ -930,4 +969,22 @@ func GetLatestVersion(dir string) (int64, error) {
 		return 0, err
 	}
 	return walVersion(lastIndex, uint32(metadata.InitialVersion)), nil
+}
+
+func channelBatchRecv[T any](ch <-chan *T) []*T {
+	// block if channel is empty
+	item := <-ch
+	if item == nil {
+		// channel is closed
+		return nil
+	}
+
+	remaining := len(ch)
+	result := make([]*T, 0, remaining+1)
+	result = append(result, item)
+	for i := 0; i < remaining; i++ {
+		result = append(result, <-ch)
+	}
+
+	return result
 }

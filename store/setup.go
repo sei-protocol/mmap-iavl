@@ -53,7 +53,6 @@ func setMemIAVL(homePath string, logger log.Logger, opts memiavl.Options, sdk46C
 			}
 
 		}
-
 		cms := rootmulti.NewStore(filepath.Join(homePath, "data", "memiavl.db"), logger, sdk46Compact)
 		cms.SetMemIAVLOptions(opts)
 		bapp.SetCMS(cms)
