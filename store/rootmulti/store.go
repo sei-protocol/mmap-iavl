@@ -8,6 +8,7 @@ import (
 	"math"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/cosmos/cosmos-sdk/types/errors"
 	protoio "github.com/gogo/protobuf/io"
@@ -36,6 +37,7 @@ type Store struct {
 	dir    string
 	db     *memiavl.DB
 	logger log.Logger
+	mtx    sync.RWMutex
 
 	// to keep it comptaible with cosmos-sdk 0.46, merge the memstores into commit info
 	lastCommitInfo *types.CommitInfo
@@ -66,6 +68,8 @@ func NewStore(dir string, logger log.Logger, sdk46Compact bool) *Store {
 
 // Implements interface Committer
 func (rs *Store) Commit(bumpVersion bool) types.CommitID {
+	rs.mtx.Lock()
+	defer rs.mtx.Unlock()
 	var changeSets []*memiavl.NamedChangeSet
 	for key := range rs.stores {
 		// it'll unwrap the inter-block cache
@@ -79,32 +83,31 @@ func (rs *Store) Commit(bumpVersion bool) types.CommitID {
 			_ = store.Commit(bumpVersion)
 		}
 	}
-	sort.SliceStable(changeSets, func(i, j int) bool {
-		return changeSets[i].Name < changeSets[j].Name
-	})
-	_, _, err := rs.db.Commit(changeSets)
-	if err != nil {
-		panic(err)
-	}
+	if bumpVersion {
+		sort.SliceStable(changeSets, func(i, j int) bool {
+			return changeSets[i].Name < changeSets[j].Name
+		})
+		_, _, err := rs.db.Commit(changeSets)
+		if err != nil {
+			panic(err)
+		}
 
-	// the underlying memiavl tree might be reloaded, reload the store as well.
-	for key := range rs.stores {
-		store := rs.stores[key]
-		if store.GetStoreType() == types.StoreTypeIAVL {
-			rs.stores[key], err = rs.loadCommitStoreFromParams(rs.db, key, rs.storesParams[key])
-			if err != nil {
-				panic(fmt.Errorf("inconsistent store map, store %s not found", key.Name()))
+		// the underlying memiavl tree might be reloaded, reload the store as well.
+		for key := range rs.stores {
+			store := rs.stores[key]
+			if store.GetStoreType() == types.StoreTypeIAVL {
+				rs.stores[key], err = rs.loadCommitStoreFromParams(rs.db, key, rs.storesParams[key])
+				if err != nil {
+					panic(fmt.Errorf("inconsistent store map, store %s not found", key.Name()))
+				}
 			}
 		}
-	}
 
-	if bumpVersion {
 		rs.lastCommitInfo = rs.db.LastCommitInfo()
 		if rs.sdk46Compact {
 			rs.lastCommitInfo = amendCommitInfo(rs.lastCommitInfo, rs.storesParams)
 		}
 	}
-
 	return rs.lastCommitInfo.CommitID()
 }
 
@@ -155,6 +158,8 @@ func (rs *Store) CacheWrapWithListeners(k types.StoreKey, listeners []types.Writ
 
 // Implements interface MultiStore
 func (rs *Store) CacheMultiStore() types.CacheMultiStore {
+	rs.mtx.RLock()
+	defer rs.mtx.RUnlock()
 	stores := make(map[types.StoreKey]types.CacheWrapper)
 	for k, v := range rs.stores {
 		store := types.KVStore(v)
@@ -174,6 +179,8 @@ func (rs *Store) CacheMultiStoreWithVersion(version int64) (types.CacheMultiStor
 	if version == 0 || (rs.lastCommitInfo != nil && version == rs.lastCommitInfo.Version) {
 		return rs.CacheMultiStore(), nil
 	}
+	rs.mtx.RLock()
+	defer rs.mtx.RUnlock()
 	opts := rs.opts
 	opts.TargetVersion = uint32(version)
 	opts.ReadOnly = true
@@ -304,7 +311,6 @@ func (rs *Store) LoadVersionAndUpgrade(version int64, upgrades *types.StoreUpgra
 	if version > math.MaxUint32 {
 		return fmt.Errorf("version overflows uint32: %d", version)
 	}
-
 	storesKeys := make([]types.StoreKey, 0, len(rs.storesParams))
 	for key := range rs.storesParams {
 		storesKeys = append(storesKeys, key)
