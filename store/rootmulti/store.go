@@ -66,47 +66,78 @@ func NewStore(dir string, logger log.Logger, sdk46Compact bool) *Store {
 	}
 }
 
-// Implements interface Committer
-func (rs *Store) Commit(bumpVersion bool) types.CommitID {
-	rs.mtx.Lock()
-	defer rs.mtx.Unlock()
+// flush writes all the pending change sets to memiavl tree.
+func (rs *Store) flush() error {
 	var changeSets []*memiavl.NamedChangeSet
 	for key := range rs.stores {
 		// it'll unwrap the inter-block cache
 		store := rs.GetCommitKVStore(key)
 		if memiavlStore, ok := store.(*memiavlstore.Store); ok {
-			changeSets = append(changeSets, &memiavl.NamedChangeSet{
-				Name:      key.Name(),
-				Changeset: memiavlStore.PopChangeSet(),
-			})
-		} else {
+			cs := memiavlStore.PopChangeSet()
+			if len(cs.Pairs) > 0 {
+				changeSets = append(changeSets, &memiavl.NamedChangeSet{
+					Name:      key.Name(),
+					Changeset: cs,
+				})
+			}
+		}
+	}
+	sort.SliceStable(changeSets, func(i, j int) bool {
+		return changeSets[i].Name < changeSets[j].Name
+	})
+	return rs.db.ApplyChangeSets(changeSets)
+}
+
+// WorkingHash returns the app hash of the working tree,
+// it's only compatible with sdk 0.47 and later.
+//
+// Implements interface Committer.
+func (rs *Store) WorkingHash() []byte {
+	if err := rs.flush(); err != nil {
+		panic(err)
+	}
+	commitInfo := rs.db.WorkingCommitInfo()
+	if rs.sdk46Compact {
+		commitInfo = amendCommitInfo(commitInfo, rs.storesParams)
+	}
+	return commitInfo.Hash()
+}
+
+// Implements interface Committer
+func (rs *Store) Commit(bumpVersion bool) types.CommitID {
+	if !bumpVersion {
+		return rs.lastCommitInfo.CommitID()
+	}
+	if err := rs.flush(); err != nil {
+		panic(err)
+	}
+
+	rs.mtx.Lock()
+	defer rs.mtx.Unlock()
+	for _, store := range rs.stores {
+		if store.GetStoreType() != types.StoreTypeIAVL {
 			_ = store.Commit(bumpVersion)
 		}
 	}
-	if bumpVersion {
-		sort.SliceStable(changeSets, func(i, j int) bool {
-			return changeSets[i].Name < changeSets[j].Name
-		})
-		_, _, err := rs.db.Commit(changeSets)
-		if err != nil {
-			panic(err)
-		}
 
-		// the underlying memiavl tree might be reloaded, reload the store as well.
-		for key := range rs.stores {
-			store := rs.stores[key]
-			if store.GetStoreType() == types.StoreTypeIAVL {
-				rs.stores[key], err = rs.loadCommitStoreFromParams(rs.db, key, rs.storesParams[key])
-				if err != nil {
-					panic(fmt.Errorf("inconsistent store map, store %s not found", key.Name()))
-				}
+	_, _, err := rs.db.Commit()
+	if err != nil {
+		panic(err)
+	}
+
+	// the underlying memiavl tree might be reloaded, reload the store as well.
+	for key := range rs.stores {
+		store := rs.stores[key]
+		if store.GetStoreType() == types.StoreTypeIAVL {
+			rs.stores[key], err = rs.loadCommitStoreFromParams(rs.db, key, rs.storesParams[key])
+			if err != nil {
+				panic(fmt.Errorf("inconsistent store map, store %s not found", key.Name()))
 			}
 		}
-
-		rs.lastCommitInfo = rs.db.LastCommitInfo()
-		if rs.sdk46Compact {
-			rs.lastCommitInfo = amendCommitInfo(rs.lastCommitInfo, rs.storesParams)
-		}
+	}
+	rs.lastCommitInfo = rs.db.LastCommitInfo()
+	if rs.sdk46Compact {
+		rs.lastCommitInfo = amendCommitInfo(rs.lastCommitInfo, rs.storesParams)
 	}
 	return rs.lastCommitInfo.CommitID()
 }
@@ -360,6 +391,8 @@ func (rs *Store) LoadVersionAndUpgrade(version int64, upgrades *types.StoreUpgra
 		}
 	}
 
+	rs.mtx.Lock()
+	defer rs.mtx.Unlock()
 	rs.db = db
 	rs.stores = newStores
 	// to keep the root hash compatible with cosmos-sdk 0.46
@@ -607,7 +640,8 @@ func amendCommitInfo(commitInfo *types.CommitInfo, storeParams map[types.StoreKe
 }
 
 func (rs *Store) GetWorkingHash() ([]byte, error) {
-	return rs.LastCommitID().Hash, nil
+	hash := rs.WorkingHash()
+	return hash, nil
 }
 
 func (rs *Store) GetEvents() []abci.Event {

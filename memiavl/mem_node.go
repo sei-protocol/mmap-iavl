@@ -14,8 +14,7 @@ type MemNode struct {
 	value   []byte
 	left    Node
 	right   Node
-
-	hash []byte
+	hash    []byte
 }
 
 var _ Node = (*MemNode)(nil)
@@ -68,6 +67,10 @@ func (node *MemNode) Mutate(version, cowVersion uint32) *MemNode {
 	n.version = version
 	n.hash = nil
 	return n
+}
+
+func (node *MemNode) SafeHash() []byte {
+	return node.Hash()
 }
 
 // Computes the hash of the node without computing its descendants. Must be
