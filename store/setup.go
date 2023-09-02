@@ -45,21 +45,11 @@ func setMemIAVL(homePath string, logger log.Logger, opts memiavl.Options, sdk46C
 	return func(bapp *baseapp.BaseApp) {
 		// trigger state-sync snapshot creation by memiavl
 		opts.TriggerStateSyncExport = func(height int64) {
-			logger.Info("Triggering memIAVL snapshot creation")
-			if !shouldTakeSnapshot(height, int64(opts.SnapshotInterval)) {
-				logger.Debug("snapshot is skipped", "height", height)
-			} else {
-				go bapp.Snapshot(height)
-			}
-
+			logger.Info("Triggering memIAVL state snapshot creation")
+			bapp.SnapshotIfApplicable(uint64(height))
 		}
 		cms := rootmulti.NewStore(filepath.Join(homePath, "data", "memiavl.db"), logger, sdk46Compact)
 		cms.SetMemIAVLOptions(opts)
 		bapp.SetCMS(cms)
 	}
-}
-
-// shouldTakeSnapshot returns true is snapshot should be taken at height.
-func shouldTakeSnapshot(height int64, snapshotInterval int64) bool {
-	return snapshotInterval > 0 && height%snapshotInterval == 0
 }
