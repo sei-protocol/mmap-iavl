@@ -3,6 +3,7 @@ package rootmulti
 import (
 	"fmt"
 	"github.com/sei-protocol/mmap-iavl/memiavl"
+	"github.com/sei-protocol/mmap-iavl/store/cachemulti"
 	"github.com/sei-protocol/mmap-iavl/store/memiavlstore"
 	"io"
 	"math"
@@ -17,7 +18,6 @@ import (
 	dbm "github.com/tendermint/tm-db"
 
 	snapshottypes "github.com/cosmos/cosmos-sdk/snapshots/types"
-	"github.com/cosmos/cosmos-sdk/store/cachemulti"
 	"github.com/cosmos/cosmos-sdk/store/listenkv"
 	"github.com/cosmos/cosmos-sdk/store/mem"
 	"github.com/cosmos/cosmos-sdk/store/rootmulti"
@@ -201,7 +201,7 @@ func (rs *Store) CacheMultiStore() types.CacheMultiStore {
 		}
 		stores[k] = store
 	}
-	return cachemulti.NewStore(nil, stores, rs.keysByName, nil, nil, nil)
+	return cachemulti.NewStore(nil, stores, rs.keysByName, nil, nil, nil, nil)
 }
 
 // Implements interface MultiStore
@@ -233,7 +233,7 @@ func (rs *Store) CacheMultiStoreWithVersion(version int64) (types.CacheMultiStor
 		stores[rs.keysByName[tree.Name]] = memiavlstore.New(tree.Tree, rs.logger)
 	}
 
-	return cachemulti.NewStore(nil, stores, rs.keysByName, nil, nil, nil), nil
+	return cachemulti.NewStore(nil, stores, rs.keysByName, nil, nil, nil, db), nil
 }
 
 // Implements interface MultiStore
