@@ -60,6 +60,7 @@ func NewEmptySnapshot(version uint32) *Snapshot {
 // and mmap the other files.
 func OpenSnapshot(snapshotDir string) (*Snapshot, error) {
 	// read metadata file
+	fmt.Println("[MEMIAVL-DEBUG] open snapshot", snapshotDir)
 	bz, err := os.ReadFile(filepath.Join(snapshotDir, FileNameMetadata))
 	if err != nil {
 		return nil, err

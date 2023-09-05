@@ -2,6 +2,7 @@ package memiavl
 
 import (
 	"bytes"
+	"container/list"
 	"crypto/sha256"
 	"errors"
 	"fmt"
@@ -293,4 +294,35 @@ func nextVersionU32(v uint32, initialVersion uint32) uint32 {
 		return initialVersion
 	}
 	return v + 1
+}
+
+func (t *Tree) LevelOrderTraversal() {
+	if t.root == nil {
+		return
+	}
+
+	queue := list.New()
+	queue.PushBack(t.root)
+	count := 0
+	level := 1
+
+	for queue.Len() > 0 {
+		node := queue.Front().Value.(Node)
+		queue.Remove(queue.Front())
+
+		fmt.Printf("%s:%s,%d,%t ", node.Key(), node.Value(), node.Height(), node.IsLeaf())
+		count++
+		if count == int(math.Pow(2, float64(level)))-1 {
+			fmt.Println()
+			level++
+		}
+
+		if node.Left() != nil {
+			queue.PushBack(node.Left())
+		}
+		if node.Right() != nil {
+			queue.PushBack(node.Right())
+		}
+	}
+
 }
